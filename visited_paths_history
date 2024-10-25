@@ -44,9 +44,14 @@ inc_history() {
     local hist_file="$1"
     local path="$2"
     if [ -d "${path}" ]; then
-        path=$(realpath "$path")
+        path="$(realpath "$path")"
     else
-        return 1
+       return 1 
+    fi
+    hist_file="$(realpath -m "$hist_file")"
+    if [ ! -f "${hist_file}" ]; then
+      mkdir -p "$(dirname "$hist_file")"
+      touch "${hist_file}"
     fi
     local should_add=true
     local first=true 
@@ -71,7 +76,7 @@ inc_history() {
 }
 
 # Example
-hfile=$(mktemp "${TMPDIR:-/tmp/}$(basename $0)-XXXXXXXXXXXXXXX")
+hfile="${TMPDIR:-/tmp/}aaaa/$(mktemp -u "$(basename $0)-XXXXXXXXXXXXXXX")"
 inc_history "$hfile" "/home/$USER"
 inc_history "$hfile" "/home/$USER"
 inc_history "$hfile" "/etc"
