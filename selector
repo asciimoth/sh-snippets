@@ -1,0 +1,100 @@
+#!/bin/sh
+
+# Function to implement select dialog that wraps multiple tools
+# like dmenu, rofi, fzf, zenity and so on.
+# It provides same abstract interface over them and automatically
+# selecting the appropriate dialog provider from those available in
+# current environment.
+selec() {
+    # Get the flag for GUI usage
+    local use_gui=false
+    if [ "$1" = "gui" ]; then
+        use_gui=true
+        shift
+    fi
+    if [ "$1" = "cli" ]; then
+        shift
+    fi
+    local prompt=""
+    if [ "$1" = "--prompt" ]; then
+        shift
+        prompt="$1"
+        shift
+    fi
+
+    # Function to check if a program is available
+    check_program() {
+        command -v "$1" >/dev/null 2>&1
+    }
+
+    # Determine the selection program
+    local selection_program=""
+    if [ "$use_gui" = true ]; then
+        if check_program zenity; then
+            if [ "$prompt" ]; then
+                selection_program="zenity --title='$prompt' --text='' --list --column='' 2>/dev/null"
+            else
+                selection_program="zenity --text='' --list --column='' 2>/dev/null"
+            fi
+        elif check_program yad; then # zenity fork
+            # May not work cause yad sometimes return additional CR symbol
+            # in the and of output
+            if [ "$prompt" ]; then
+                selection_program="yad --title='$prompt' --text='' --list --column='' 2>/dev/null"
+            else
+                selection_program="yad --text='' --list --column='' 2>/dev/null"
+            fi
+        elif check_program rofi; then
+            selection_program="rofi -dmenu -p '$prompt'"
+        elif check_program dunst; then
+            selection_program="dmenu"
+        elif check_program wofi; then
+            selection_program="wofi --dmenu"
+        else
+            echo "No supported GUI selection program found."
+            return 111
+        fi
+    else
+        if check_program fzf; then
+            if [ "$prompt" ]; then
+                selection_program="fzf --prompt='$prompt> '"
+            else
+                selection_program="fzf"
+            fi
+        elif check_program sk; then # skim
+            if [ "$prompt" ]; then
+                selection_program="sk --prompt '$prompt> '"
+            else
+                selection_program="sk"
+            fi
+        else
+            echo "No supported CLI selection program found."
+            return 111
+        fi
+    fi
+
+    cat | eval "$selection_program"
+}
+
+# Gui example
+item="$(echo -e 'apple pie\nbanana pie\ncherry pie' | selec gui --prompt 'Select pie')"
+code="$?"
+if [ $code -eq 0 ]; then
+    echo "Selected: $item"
+elif [ $code -eq 111 ]; then
+    echo "Error: $item" >&2
+else
+    echo "No items selected." >&2
+fi
+
+# Cli example
+item="$(echo -e 'apple pie\nbanana pie\ncherry pie' | selec cli --prompt 'Select pie')"
+code="$?"
+if [ $code -eq 0 ]; then
+    echo "Selected: $item"
+elif [ $code -eq 111 ]; then
+    echo "Error: $item" >&2
+else
+    echo "No items selected." >&2
+fi
+
