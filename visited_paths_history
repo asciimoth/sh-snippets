@@ -1,0 +1,82 @@
+#!/bin/sh
+
+# History record format: <visits counter> <path>
+# One record per line
+# History file example:
+# 10 /some/path
+# 42 /another/path
+
+# get_history $HISTORY_FILE --no-counters
+# Read records one by one from file and prints them
+# Drop invalid records
+# Expand each path to abs version
+# Sort records by counter from largest to smallest
+# Can omit counters numbers with --no-counters flag
+get_history() {
+    local hist_file="$1"
+    local show_counters=true
+    if [ "$2" = "--no-counters" ]; then
+        show_counters=false
+    fi
+    if [ ! -f "${hist_file}" ]; then
+      return 1
+    fi
+    sort -gr "$hist_file" |
+    while read -r line; do
+      local counter="$(echo $line | cut -d ' ' -f 1)"
+      local path="${line#* }"
+      if [ -d "${path}" ]; then
+          local path=$(realpath "$path")
+          if [ "$show_counters" = true ]; then
+            echo "$counter $path"
+          else
+            echo "$path"
+          fi
+      fi
+    done
+}
+
+# inc_history $HISTORY_FILE $path
+# Reads history via get_history()
+# If there is record for $path, increment counter in it
+# else create new record with counter=1
+inc_history() {
+    local hist_file="$1"
+    local path="$2"
+    if [ -d "${path}" ]; then
+        path=$(realpath "$path")
+    else
+        return 1
+    fi
+    local should_add=true
+    local first=true 
+    while read -r line; do
+        if [ "$first" = true ]; then
+            echo -n "" > "$hist_file"
+            first=false
+        fi
+        local counter="$(echo $line | cut -d ' ' -f 1)"
+        local cur_path="${line#* }"
+        if [ "$cur_path" = "$path" ]; then
+            counter=$((counter+1))
+            echo "$counter $cur_path" >> "$hist_file"
+            should_add=false
+        else
+            echo "$counter $cur_path" >> "$hist_file"
+        fi
+    done <<< "$(get_history "$hist_file")"
+    if [ "$should_add" = true ]; then
+        echo "1 $path" >> "$hist_file"
+    fi
+}
+
+# Example
+hfile=$(mktemp "${TMPDIR:-/tmp/}$(basename $0)-XXXXXXXXXXXXXXX")
+inc_history "$hfile" "/home/$USER"
+inc_history "$hfile" "/home/$USER"
+inc_history "$hfile" "/etc"
+inc_history "$hfile" "/bin"
+inc_history "$hfile" "/bin"
+get_history "$hfile"
+rm "$hfile"
+
