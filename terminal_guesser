@@ -1,0 +1,55 @@
+#!/bin/sh
+
+# Function to check if cmd is available
+check_cmd() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+# Guess terminal that should be used
+guess_term() {
+  # TODO Add env var to force some prefered term
+
+  # List of *nix terminal emulators from WikiPedia + those I remembered
+  # Fell free to open PR if you know some terminal I miss
+  terms=(
+    st wayst foot contour rio darktile wezterm alacritty kitty tilix konsole
+    yakuake xfce4-terminal mate-terminal gnome-terminal guake roxterm
+    qterminal tilix terminal iterm iTerm iterm2 iTerm2 zoc
+    i3-sensible-terminal termite rxvt xterm
+  )
+  # Session leader parrent
+  local slp=$(ps -o sid= -p "$$" | xargs ps -o ppid= -p | xargs ps -o comm= -p)
+  # Check if $TERM or $slp contain known terminal name
+  for t in ${terms[*]}
+  do
+    if [ "$t" = "$TERM" ]; then
+      echo "$t"
+      return 0
+    fi
+    if [ "$t" = "$slp" ]; then
+      echo "$t"
+      return 0
+    fi
+  done
+  # TODO Check some well-known configs
+  # Iterate over all known terminal and return first finded in env
+  for t in ${terms[*]}
+  do
+    if check_cmd "$t"; then
+      echo "$t"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Example
+term="$(guess_term)"
+if [ $? -eq 0 ]; then
+  eval "$term -e top"
+else
+  echo "Failed to guess terminal" >&2
+  exit 1
+fi
+
+
